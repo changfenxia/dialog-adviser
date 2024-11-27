@@ -2,8 +2,12 @@ import logging
 import easyocr
 from typing import List
 from yandex_cloud_ml_sdk import YCloudML
-
-logger = logging.getLogger(__name__)
+from config import (
+    YANDEX_GPT_MODEL, 
+    GPT_TEMPERATURE, 
+    GPT_MAX_TOKENS,
+    logger
+)
 
 class TextRecognizer:
     def __init__(self):
@@ -55,9 +59,13 @@ class YandexGPTClient:
                 raise ValueError("Missing Yandex credentials")
             
             self.sdk = YCloudML(folder_id=folder_id, auth=api_key)
-            self.model = self.sdk.models.completions('yandexgpt')
-            self.model = self.model.configure(temperature=0.7)
-            logger.info("YandexGPTClient initialized successfully")
+            self.model = self.sdk.models.completions(YANDEX_GPT_MODEL)
+            self.model = self.model.configure(
+                temperature=GPT_TEMPERATURE,
+                max_tokens=GPT_MAX_TOKENS
+            )
+            logger.info(f"YandexGPTClient initialized successfully with model={YANDEX_GPT_MODEL}, "
+                       f"temperature={GPT_TEMPERATURE}, max_tokens={GPT_MAX_TOKENS}")
         except Exception as e:
             logger.error(f"Failed to initialize YandexGPTClient: {e}")
             raise

@@ -33,11 +33,16 @@ def start_bot():
     cleanup_files()  # Clean up any stale files before starting
     
     try:
+        # Set up environment variables for the subprocess
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(BOT_DIR)
+        
         process = subprocess.Popen(
-            [str(VENV_PYTHON), "app/bot.py"],
+            [str(VENV_PYTHON), "-m", "app.bot"],
             cwd=str(BOT_DIR),
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env=env
         )
         
         # Wait a bit to see if the process starts successfully
@@ -50,6 +55,7 @@ def start_bot():
             logger.error(f"stderr: {stderr.decode()}")
             return
         
+        # Write PID file
         PID_FILE.write_text(str(process.pid))
         logger.info(f"Bot started with PID {process.pid}")
         

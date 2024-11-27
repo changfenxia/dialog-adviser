@@ -6,6 +6,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 import os
 import sys
 from pathlib import Path
+import time
 
 # Add the app directory to Python path
 app_dir = Path(__file__).resolve().parent
@@ -40,6 +41,7 @@ async def start_handler(message: types.Message):
 @dp.message_handler(content_types=['photo'], state=DialogStates.waiting_for_images)
 async def handle_photos(message: types.Message, state: FSMContext):
     logger.info("Received photo message")
+    
     async with state.proxy() as data:
         if 'photos' not in data:
             data['photos'] = []
@@ -56,9 +58,14 @@ async def handle_photos(message: types.Message, state: FSMContext):
             return
             
         try:
-            photo = message.photo[-1]
-            file_path = f"temp_{len(data['photos'])}.jpg"
+            photo = message.photo[-1]  # Берем самое большое разрешение
+            # Используем timestamp в имени файла для уникальности
+            file_path = f"temp/photo_{int(time.time())}_{len(data['photos'])}.jpg"
             logger.info(f"Saving photo to {file_path}")
+            
+            # Создаем директорию temp, если её нет
+            os.makedirs("temp", exist_ok=True)
+            
             await photo.download(file_path)
             data['photos'].append(file_path)
             photos_count = len(data['photos'])
@@ -113,11 +120,25 @@ async def process_callback(callback_query: types.CallbackQuery, state: FSMContex
             image_paths = data['photos']
             logger.info(f"Processing images: {image_paths}")
             
+            # Добавляем разделитель в логи для лучшей читаемости
+            logger.info("="*50)
+            logger.info("Начинаю распознавание текста из изображений:")
+            
             text = await text_recognizer.extract_text_from_images(image_paths)
-            logger.info(f"Extracted text: {text}")
+            
+            # Логируем распознанный текст с разделителями для каждого изображения
+            logger.info("\nРаспознанный текст из всех изображений:")
+            logger.info("-"*50)
+            logger.info(text)
+            logger.info("-"*50)
             
             formatted_dialog = text_recognizer.format_dialog(text)
-            logger.info(f"Formatted dialog: {formatted_dialog}")
+            
+            # Логируем отформатированный диалог
+            logger.info("\nОтформатированный диалог для анализа:")
+            logger.info("-"*50)
+            logger.info(formatted_dialog)
+            logger.info("-"*50)
             
             # Clean up temporary files
             for path in image_paths:
@@ -129,20 +150,43 @@ async def process_callback(callback_query: types.CallbackQuery, state: FSMContex
             
             prompt = ADVICE_PROMPT if callback_query.data == 'advice' else ANALYZE_PROMPT
             prompt = prompt.format(dialog=formatted_dialog)
-            logger.info(f"Generated prompt: {prompt}")
+            
+            # Логируем финальный промпт для GPT
+            logger.info("\nПодготовленный промпт для GPT:")
+            logger.info("-"*50)
+            logger.info(prompt)
+            logger.info("-"*50)
             
             response = await gpt_client.generate_response(prompt)
-            logger.info(f"Got response from GPT: {response}")
+            
+            # Логируем ответ GPT
+            logger.info("\nОтвет от GPT:")
+            logger.info("-"*50)
+            logger.info(response)
+            logger.info("-"*50)
+            logger.info("="*50)
             
             await callback_query.message.answer(response)
             logger.info("Sent response to user")
             
+            # After sending response, prompt for new analysis
+            await state.finish()
+            await DialogStates.waiting_for_images.set()
+            await callback_query.message.answer(
+                "\nХотите проанализировать другой диалог?\n"
+                "Отправьте мне скриншот диалога (можно загрузить до 3 скриншотов)."
+            )
+            
         except Exception as e:
             logger.error(f"Error processing callback: {e}")
-            await callback_query.message.answer("Произошла ошибка при обработке запроса. Пожалуйста, попробуйте еще раз.")
-        
-    await state.finish()
-    logger.info("Finished processing callback")
+            await callback_query.message.answer(
+                "Произошла ошибка при обработке запроса. Пожалуйста, попробуйте еще раз.\n"
+                "Отправьте мне скриншот диалога для нового анализа."
+            )
+            await state.finish()
+            await DialogStates.waiting_for_images.set()
+    
+    logger.info("Finished processing callback and reset state for new analysis")
 
 if __name__ == '__main__':
     from aiogram import executor
