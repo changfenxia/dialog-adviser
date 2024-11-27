@@ -1,0 +1,11 @@
+aiogram==2.25.1
+python-dotenv==1.0.0
+easyocr
+aiohttp>=3.8.0,<3.9.0
+python-telegram-bot==13.7
+Pillow==9.5.0
+numpy==1.24.3
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.0.1
+torchvision==0.15.2
+yandex-cloud-ml-sdk 
